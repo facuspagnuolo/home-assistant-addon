@@ -58,5 +58,22 @@ printf 'Unit: %s\n' "$UNIT_ID"
 printf 'Server: %s\n' "$SERVER_ADDRESS"
 printf 'Target: %s\n' "$TARGET"
 
+CONNECTOR_IP=$(
+    ip -4 addr show scope global \
+    | awk '/inet / {print $2}' \
+    | cut -d/ -f1 \
+    | head -n1
+)
+
+printf 'Connector IPv4: %s\n' "${CONNECTOR_IP:-unknown}"
+
+HA_IP=$(getent hosts homeassistant 2>/dev/null | awk 'NR==1 {print $1}')
+
+printf 'Home Assistant IP: %s\n' "${HA_IP:-unknown}"
+
+if command -v ip >/dev/null 2>&1 && [ -n "${HA_IP:-}" ]; then
+    printf 'Route to Home Assistant: %s\n' "$(ip route get "$HA_IP" 2>/dev/null || true)"
+fi
+
 export RUST_LOG="$LOG_LEVEL"
 exec /usr/local/bin/rathole --client "$RATHOLE_CONFIG"
