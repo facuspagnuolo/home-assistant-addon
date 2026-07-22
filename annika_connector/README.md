@@ -1,7 +1,7 @@
 # Annika Connector
 
-Minimal add-on that creates an outbound tunnel from Home Assistant to a
-remote server using the `rathole` v0.5.0 client. The tunnel points to the
+Minimal add-on that creates an outbound tunnel from Home Assistant to the
+Annika Gateway using the `rathole` v0.5.0 client. The tunnel points to the
 internal service `homeassistant:8123`; it does not publish any ports or
 modify the Home Assistant configuration.
 
@@ -18,45 +18,24 @@ modify the Home Assistant configuration.
 In the add-on's **Configuration** tab, enter:
 
 ```yaml
-server_address: "example.com:2333"
 unit_id: "unit-123"
-token: "replace-with-the-server-token"
 log_level: "info"
 ```
 
-`unit_id` must match the service name configured on the `rathole` server and
-may only contain ASCII letters, digits, hyphens and underscores. The token is
-required and must match the one configured for the remote service.
+`unit_id` is the id of the unit as registered in the Annika Backend, and may
+only contain ASCII letters, digits, hyphens and underscores.
 
-Save the configuration and select **Start**. To check the connection, open
-the add-on's **Log** tab. The process reports the unit, the server and the
-target, but it never prints the token.
+Save the configuration and select **Start**. On startup, the add-on calls the
+Annika Gateway (`https://gateway.annikagroup.com/connectors/register`) with
+its `unit_id` and, once the Gateway confirms the connector is registered and
+active, generates its own `rathole-client.toml` from the response and starts
+the tunnel. No server address or token needs to be configured by hand — the
+Gateway assigns and hands them over automatically.
 
-This repository implements only the client. The `rathole` server and its
-corresponding service must already exist.
+To check the connection, open the add-on's **Log** tab. The process reports
+the unit, the registration attempts, the server and the target, but it never
+prints the token.
 
-## Server configuration
-
-The `rathole` service must listen on all interfaces **inside the
-container**, so Docker can publish the port:
-
-```toml
-[server.services.casa-facu]
-token = "SECRET"
-bind_addr = "0.0.0.0:18123"
-```
-
-The tunnel port must be published only on the EC2's loopback interface. In
-Docker Compose:
-
-```yaml
-ports:
-  - "2333:2333"
-  - "127.0.0.1:18123:18123"
-```
-
-This way, `2333` receives connections from clients over the internet, and
-the Home Assistant service becomes reachable at `127.0.0.1:18123` on the EC2
-instance, without exposing that port publicly. A gateway running in another
-container must share the Docker network with `rathole` and connect to the
-service name on port `18123`; it must not use the EC2's loopback address.
+This repository implements only the client. The registration, provisioning,
+and `rathole` server side of the tunnel live in the `gateway` and `backend`
+repositories.

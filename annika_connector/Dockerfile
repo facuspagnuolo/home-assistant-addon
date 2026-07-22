@@ -30,7 +30,7 @@ RUN case "${BUILD_ARCH}" in \
 FROM debian:bookworm-slim
 
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates jq \
+    && apt-get install --yes --no-install-recommends ca-certificates curl iproute2 jq \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=downloader /out/rathole /usr/local/bin/rathole

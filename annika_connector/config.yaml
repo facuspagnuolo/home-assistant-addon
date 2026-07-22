@@ -9,12 +9,8 @@ startup: application
 boot: auto
 init: false
 options:
-  server_address: "example.com:2333"
   unit_id: "unit-123"
-  token: ""
   log_level: info
 schema:
-  server_address: str
   unit_id: "match(^[a-zA-Z0-9_-]+$)"
-  token: password
   log_level: "list(error|warn|info|debug|trace)"
