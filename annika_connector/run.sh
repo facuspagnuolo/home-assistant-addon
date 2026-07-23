@@ -2,6 +2,7 @@
 set -eu
 
 OPTIONS_FILE="/data/options.json"
+STATE_FILE="/data/connector-state.json"
 RATHOLE_CONFIG="/data/rathole-client.toml"
 TARGET="homeassistant:8123"
 GATEWAY_REGISTER_URL="https://gateway.annikagroup.com/connectors/register"
@@ -32,40 +33,57 @@ LOG_LEVEL=$(jq -r '.log_level' "$OPTIONS_FILE")
 
 printf 'Starting Annika Connector\n'
 printf 'Unit: %s\n' "$UNIT_ID"
-printf 'Registering with: %s\n' "$GATEWAY_REGISTER_URL"
 
-REGISTER_BODY=$(jq -nr --arg unitId "$UNIT_ID" '{unitId: $unitId} | tojson')
-
-attempt=1
 REGISTER_RESPONSE=""
-while [ "$attempt" -le "$REGISTER_MAX_ATTEMPTS" ]; do
-    if REGISTER_RESPONSE=$(curl --fail --silent --show-error \
-            --header 'Content-Type: application/json' \
-            --data "$REGISTER_BODY" \
-            "$GATEWAY_REGISTER_URL" 2>/dev/null) \
-        && printf '%s' "$REGISTER_RESPONSE" | jq -e '
+
+if [ -f "$STATE_FILE" ] && printf '%s' "$(cat "$STATE_FILE")" | jq -e --arg unitId "$UNIT_ID" '
     type == "object"
+    and .unit_id == $unitId
     and (.service | type == "string" and length > 0)
     and (.token | type == "string" and length > 0)
     and (.server | type == "string" and length > 0)
 ' >/dev/null 2>&1
-    then
-        break
-    fi
+then
+    printf 'Reusing the connector assignment saved from a previous registration\n'
+    REGISTER_RESPONSE=$(cat "$STATE_FILE")
+else
+    printf 'Registering with: %s\n' "$GATEWAY_REGISTER_URL"
 
-    printf 'Registration attempt %s/%s failed, retrying in %ss...\n' \
-        "$attempt" "$REGISTER_MAX_ATTEMPTS" "$REGISTER_RETRY_DELAY_SECONDS"
-    attempt=$((attempt + 1))
-    sleep "$REGISTER_RETRY_DELAY_SECONDS"
-done
+    REGISTER_BODY=$(jq -nr --arg unitId "$UNIT_ID" '{unitId: $unitId} | tojson')
 
-printf '%s' "$REGISTER_RESPONSE" | jq -e '
-    type == "object"
-    and (.service | type == "string" and length > 0)
-    and (.token | type == "string" and length > 0)
-    and (.server | type == "string" and length > 0)
-' >/dev/null 2>&1 \
-    || fail "Could not register with the Annika Gateway after $REGISTER_MAX_ATTEMPTS attempts"
+    attempt=1
+    while [ "$attempt" -le "$REGISTER_MAX_ATTEMPTS" ]; do
+        if REGISTER_RESPONSE=$(curl --fail --silent --show-error \
+                --header 'Content-Type: application/json' \
+                --data "$REGISTER_BODY" \
+                "$GATEWAY_REGISTER_URL" 2>/dev/null) \
+            && printf '%s' "$REGISTER_RESPONSE" | jq -e '
+        type == "object"
+        and (.service | type == "string" and length > 0)
+        and (.token | type == "string" and length > 0)
+        and (.server | type == "string" and length > 0)
+    ' >/dev/null 2>&1
+        then
+            break
+        fi
+
+        printf 'Registration attempt %s/%s failed, retrying in %ss...\n' \
+            "$attempt" "$REGISTER_MAX_ATTEMPTS" "$REGISTER_RETRY_DELAY_SECONDS"
+        attempt=$((attempt + 1))
+        sleep "$REGISTER_RETRY_DELAY_SECONDS"
+    done
+
+    printf '%s' "$REGISTER_RESPONSE" | jq -e '
+        type == "object"
+        and (.service | type == "string" and length > 0)
+        and (.token | type == "string" and length > 0)
+        and (.server | type == "string" and length > 0)
+    ' >/dev/null 2>&1 \
+        || fail "Could not register with the Annika Gateway after $REGISTER_MAX_ATTEMPTS attempts"
+
+    umask 077
+    printf '%s' "$REGISTER_RESPONSE" | jq --arg unitId "$UNIT_ID" '. + {unit_id: $unitId}' > "$STATE_FILE"
+fi
 
 SERVICE=$(printf '%s' "$REGISTER_RESPONSE" | jq -r '.service')
 TOKEN=$(printf '%s' "$REGISTER_RESPONSE" | jq -r '.token')
