@@ -89,6 +89,11 @@ SERVICE=$(printf '%s' "$REGISTER_RESPONSE" | jq -r '.service')
 TOKEN=$(printf '%s' "$REGISTER_RESPONSE" | jq -r '.token')
 SERVER_ADDRESS=$(printf '%s' "$REGISTER_RESPONSE" | jq -r '.server')
 
+if [ -z "$SERVICE" ] || [ -z "$TOKEN" ] || [ -z "$SERVER_ADDRESS" ]; then
+    rm -f "$STATE_FILE"
+    fail "Received an invalid connector assignment (missing service, token or server); cleared any saved state, restart the add-on to register again"
+fi
+
 SERVER_TOML=$(jq -nr --arg value "$SERVER_ADDRESS" '$value | tojson')
 TOKEN_TOML=$(jq -nr --arg value "$TOKEN" '$value | tojson')
 

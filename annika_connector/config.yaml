@@ -1,5 +1,5 @@
 name: Annika Connector
-version: "1.1.0"
+version: "1.1.1"
 slug: annika_connector
 description: Outbound rathole tunnel for Home Assistant
 arch:

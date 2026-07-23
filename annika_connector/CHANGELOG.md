@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.1
+
+- Guard against an invalid connector assignment (missing `service`, `token`
+  or `server`) coming from either a fresh registration or a saved state
+  file. Instead of writing a broken `rathole-client.toml` and crashing on
+  parse, the add-on now clears the saved state and fails with a clear error
+  so the next restart registers from scratch.
+
 ## 1.1.0
 
 - Persist the connector assignment (`service`, `token`, `server`) returned by
